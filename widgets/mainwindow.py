@@ -25,13 +25,23 @@ import os
 import math
 
 from PyQt5 import uic
-from PyQt5.QtCore import QRectF, QLineF, Qt
+from PyQt5.QtCore import QRectF, QLineF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
-    QGraphicsView, QGraphicsEllipseItem
+    QGraphicsEllipseItem, QFileDialog, QGraphicsLineItem, QMessageBox, \
+    QInputDialog
 from PyQt5.QtGui import QPen
 from PyQt5.QtGui import QBrush
+from PyQt5.QtCore import Qt
 
 from utilities import getResourcesPath
+
+
+RESOLUTION = 1
+
+
+def setResolution(res):
+    global RESOLUTION
+    RESOLUTION = res
 
 
 class MainWindow(QMainWindow):
@@ -40,23 +50,85 @@ class MainWindow(QMainWindow):
         uic.loadUi(os.path.join(getResourcesPath(), 'ui', 'mainwindow.ui'),
                    self)
         self.actionExit.triggered.connect(QApplication.quit)
-        self.actionLoad_G_Code.triggered.connect(self.loadGCode)
+        self.actionLoad_G_Code.triggered.connect(self.askGCodeFile)
+        self.actionClear.triggered.connect(self.askClearScene)
+        self.actionZoomIn.triggered.connect(self.zoomIn)
+        self.actionZoomOut.triggered.connect(self.zoomOut)
+        self.actionResetZoom.triggered.connect(self.resetZoom)
+        self.actionSetResolution.triggered.connect(self.askResolution)
 
+        self.zoomFactor = 1
         self.scene = QGraphicsScene()
-        self.scene.addRect(QRectF(0, 0, 200, 290))
+        self.scene.addRect(QRectF(0, 0, 290 * RESOLUTION, 200 * RESOLUTION))
         self.graphicsView.setScene(self.scene)
         self.graphicsView.scale(1, -1)
+        self.updateStatusBar()
 
-    def loadGCode(self):
+    def updateStatusBar(self):
+        self.statusBar.showMessage('Current resolution scale: %d' % RESOLUTION)
+
+    def askResolution(self):
+        if self.askClearScene():
+            res = QInputDialog.getDouble(self, 'Change resolution',
+                                         'Enter a new resolution:',
+                                         RESOLUTION, 1)
+            if res[1]:
+                setResolution(res[0])
+                self.updateStatusBar()
+                self.clearScene()
+
+    def askClearScene(self):
+        msgbox = QMessageBox()
+        msgbox.setText('This will clear the area.')
+        msgbox.setInformativeText('Are you sure you want to continue?')
+        msgbox.setStandardButtons(
+            QMessageBox.Cancel | QMessageBox.Ok)
+        msgbox.setDefaultButton(QMessageBox.Cancel)
+        ret = msgbox.exec()
+        if ret == QMessageBox.Ok:
+            setResolution(1)
+            self.updateStatusBar()
+            self.clearScene()
+            return True
+        return False
+
+    def clearScene(self):
+        self.scene.clear()
+        self.scene.addRect(QRectF(0, 0, 290 * RESOLUTION, 200 * RESOLUTION))
+
+
+    def askGCodeFile(self):
+        filetuple = QFileDialog.getOpenFileName(self,
+                                                'Select G Code file',
+                                                getResourcesPath(),
+                                                'G Code files (*.gcode);;'
+                                                'Text files (*.txt)')
+        if filetuple:
+            self.loadGCode(filetuple[0])
+
+    def zoomIn(self):
+        self.graphicsView.scale(1.15, 1.15)
+        self.zoomFactor *= 1.15
+
+    def zoomOut(self):
+        self.graphicsView.scale(1.0 / 1.15, 1.0 / 1.15)
+        self.zoomFactor /= 1.15
+
+    def resetZoom(self):
+        self.graphicsView.scale(1.0 / self.zoomFactor, 1.0 / self.zoomFactor)
+        self.zoomFactor = 1
+
+    def loadGCode(self, filename):
         rawSteps = []
         # a step is tuple of str (command) and dict of arg -> value
         # eg ('G1', {'X': 0})
-        with open(os.path.join(getResourcesPath(), 'gcode', 'gcode.txt')) as f:
+        with open(filename) as f:
             for line in f:
-                if line.startswith(';'):
-                    continue
+                line = line.split(';',1)[0]
                 if line.endswith('\n'):
                     line = line[:-1]
+                if not line:
+                    continue
                 splitted = line.split(' ')
                 cmd = splitted[0]
                 packedArgs = splitted[1:]
@@ -64,19 +136,9 @@ class MainWindow(QMainWindow):
                 for arg in packedArgs:
                     args[arg[0]] = arg[1:]
                 rawSteps.append((cmd, args))
-        prevX = 0
-        prevY = 0
         for rawStep in rawSteps:
             cmd = rawStep[0]
             args = rawStep[1]
-            try:
-                prevX = args['X']
-            except:
-                args['X'] = prevX
-            try:
-                prevY = args['Y']
-            except:
-                args['Y'] = prevY
             if cmd == 'G2' or cmd == 'G3':
                 try:
                     args['I']
@@ -89,71 +151,67 @@ class MainWindow(QMainWindow):
         self.execGCode(rawSteps)
 
     def execGCode(self, codes):
-        prevX = float(codes[0][1]['X'])
-        prevY = float(codes[0][1]['Y'])
+        relative_mode = False
+        prevX = 0
+        prevY = 0
         for code in codes:
             cmd = code[0]
             args = code[1]
-            x = float(args['X'])
-            y = float(args['Y'])
-            if cmd == 'G1':
+            if 'X' in args:
+                x = (RESOLUTION * float(args['X'])) + \
+                    (prevX if relative_mode else 0)
+            else:
+                x = prevX
+            if 'Y' in args:
+                y = (RESOLUTION * float(args['Y'])) + \
+                    (prevY if relative_mode else 0)
+            else:
+                y = prevY
+            if cmd == 'G0':
+                line = QColoredGraphicsLineItem(QLineF(prevX, prevY, x, y),
+                                                Qt.green)
+                self.scene.addItem(line)
+            elif cmd == 'G1':
                 self.scene.addLine(QLineF(prevX, prevY, x, y))
             elif cmd == 'G2' or cmd == 'G3':
-                # voodoo magic for drawing arcs.
-                offsetX = float(args['I'])
-                offsetY = float(args['J'])
-                if args['I'] != 0:
-                    radius = abs(offsetX)
-                else:
-                    radius = abs(offsetY)
+                offsetX = RESOLUTION * float(args['I'])
+                offsetY = RESOLUTION * float(args['J'])
+                radius = math.sqrt(offsetX ** 2 + offsetY ** 2)
                 middleX = prevX + offsetX
                 middleY = prevY + offsetY
                 rectBottomLeftX = middleX - radius
                 rectBottomLeftY = middleY - radius
                 rectLength = 2 * radius
-                arcLength = self.calcArc(prevX, prevY, middleX, middleY,
-                                         x, y, radius)
-                arcOffset = self.calcArc(prevX, prevY, middleX, middleY,
-                                         middleX + radius, middleY, radius)
-                if offsetY < 0:
-                    arcOffset = 360 - arcOffset
+                alpha = math.degrees(math.atan2(prevY - middleY,
+                                                prevX - middleX))
+                beta = math.degrees(math.atan2(y - middleY, x - middleX))
+                if beta == 180:
+                    beta = -180
+                if alpha * beta < 0:
+                    if alpha < 0:
+                        alpha += 360
+                    elif beta < 0:
+                        beta += 360
+
+                delta = beta - alpha
+                if delta == 0:
+                    delta = 360
                 ellipse = Arc(rectBottomLeftX, rectBottomLeftY,
                               rectLength, rectLength)
-                ellipse.setStartAngle(arcOffset)
-                if cmd == 'G2':
-                    ellipse.setSpanAngle(arcLength)
-                else:
-                    ellipse.setSpanAngle(-arcLength)
+                ellipse.setStartAngle(-max(alpha, beta))
+                ellipse.setSpanAngle(abs(delta))
                 self.scene.addItem(ellipse)
+            elif cmd =='G91':
+                relative_mode = True
+            elif cmd == 'G90':
+                relative_mode = False
+            elif cmd == 'G28':
+                # reference drive + general init
+                relative_mode = False
+                x = -0.9
+                y = 242.3
             prevX = x
             prevY = y
-
-    def calcArc(self, p1x, p1y, mx, my, p2x, p2y, radius):
-        # Vector from p1 to m
-        vecp1m_x = mx - p1x
-        vecp1m_y = my - p1y
-        # Vector from m to p2
-        vecmp2_x = p2x - mx
-        vecmp2_y = p2y - my
-        # Add to vectors -> vector from p1 to p2
-        vecp1p2_x = vecp1m_x + vecmp2_x
-        vecp1p2_y = vecp1m_y + vecmp2_y
-        # Length of vector from p1 to p2
-        vecp1p2_len = math.sqrt(vecp1p2_x ** 2 + vecp1p2_y ** 2)
-        # Circular segment: Arc length in radians (formula from Wikipedia...)
-        radians = 2 * math.asin(vecp1p2_len / (2 * radius))
-        # Convert radians to degrees and be done with shit
-        return math.degrees(radians)
-
-    def wheelEvent(self, event):
-        # Make scroll -> zoom in/out
-        self.graphicsView.setTransformationAnchor(
-            QGraphicsView.AnchorUnderMouse)
-        scaleFactor = 1.15
-        if event.angleDelta().y() > 0:
-            self.graphicsView.scale(scaleFactor, scaleFactor)
-        else:
-            self.graphicsView.scale(1.0 / scaleFactor, 1.0 / scaleFactor)
 
 
 class Arc(QGraphicsEllipseItem):
@@ -174,3 +232,14 @@ class Arc(QGraphicsEllipseItem):
         painter.setPen(QPen())
         painter.setBrush(QBrush())
         painter.drawArc(self.rect(), self.startAngle(), self.spanAngle())
+
+
+class QColoredGraphicsLineItem(QGraphicsLineItem):
+    def __init__(self, line, color, parent=None):
+        super(QColoredGraphicsLineItem, self).__init__(line, parent)
+        self.color = color
+
+    def paint(self, painter, styleoptionGraphicsItem, widget=None):
+        painter.setPen(QPen(self.color))
+        painter.setBrush(QBrush())
+        painter.drawLine(self.line())

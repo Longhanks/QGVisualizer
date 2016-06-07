@@ -1,0 +1,32 @@
+; Start bottom left square
+G0 X0 Y5
+G3 X5 Y0 I5 J0
+;G1 X15 Y0
+;G3 X20 Y5 I0 J5
+;G1 X20 Y15
+;G3 X15 Y20 I-5 J0
+;G1 X5 Y20
+;G3 X0 Y15 I0 J-5
+;G1 X0 Y5
+; Start top right square
+;G0 X20 Y25
+;G1 X0 Y35
+;G2 X25 Y40 I5 J0
+;G1 X35 Y0
+;G2 X40 Y35 I-5 J0
+;G1 X0 Y25
+;G2 X35 Y20 I-5 J0
+;G1 X25 Y0
+;G2 X20 Y25 I5 J0
+; Start inner circle for bottom left
+;G0 X5 Y10
+;G3 X10 Y5 I5 J0
+;G3 X15 Y10 I0 J5
+;G3 X10 Y15 I-5 J0
+;G3 X5 Y10 I0 J-5
+; Start inner circle for top right
+;G0 X25 Y30
+;G3 X30 Y35 I5 J0
+;G3 X35 Y30 I0 J-5
+;G3 X30 Y25 I-5 J0
+;G3 X25 Y30 I0 J5
