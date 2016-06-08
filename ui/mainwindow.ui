@@ -45,6 +45,8 @@
     <addaction name="actionZoomOut"/>
     <addaction name="actionResetZoom"/>
     <addaction name="actionSetPenWidth"/>
+    <addaction name="actionShowMovement"/>
+    <addaction name="actionSetMoveLineColor"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -68,6 +70,8 @@
    <addaction name="actionResetZoom"/>
    <addaction name="separator"/>
    <addaction name="actionSetPenWidth"/>
+   <addaction name="separator"/>
+   <addaction name="actionSetMoveLineColor"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLoad_G_Code">
@@ -136,6 +140,22 @@
    </property>
    <property name="toolTip">
     <string>Set pen width</string>
+   </property>
+  </action>
+  <action name="actionShowMovement">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show movement</string>
+   </property>
+  </action>
+  <action name="actionSetMoveLineColor">
+   <property name="text">
+    <string>Set move line color...</string>
    </property>
   </action>
  </widget>

@@ -29,7 +29,8 @@ from PyQt5 import uic
 from PyQt5.QtCore import QRectF, QLineF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
     QGraphicsEllipseItem, QFileDialog, QGraphicsLineItem, QMessageBox, \
-    QInputDialog, QWidget, QStyleOptionGraphicsItem, QGraphicsItem
+    QInputDialog, QWidget, QStyleOptionGraphicsItem, QGraphicsItem,\
+    QCheckBox, QColorDialog
 from PyQt5.QtGui import QPen, QColor, QPainter
 from PyQt5.QtGui import QBrush
 from PyQt5.QtCore import Qt
@@ -56,14 +57,37 @@ class MainWindow(QMainWindow):
         self.actionZoomOut.triggered.connect(self.zoomOut)
         self.actionResetZoom.triggered.connect(self.resetZoom)
         self.actionSetPenWidth.triggered.connect(self.askPenWidth)
+        self.actionShowMovement.toggled.connect(self.actionShowMovementSlot)
+        self.checkBoxActionShowMovement = QCheckBox(
+            self.actionShowMovement.text(), self.toolBar)
+        self.checkBoxActionShowMovement.setChecked(True)
+        # noinspection PyUnresolvedReferences
+        self.checkBoxActionShowMovement.toggled.connect(
+            self.actionShowMovementSlot)
+        self.toolBar.insertWidget(self.actionSetMoveLineColor,
+                                  self.checkBoxActionShowMovement)
+        self.actionSetMoveLineColor.triggered.connect(
+            self.actionSetMoveLineColorSlot)
 
         self.zoomFactor = 1
         self._precision = 1
+        self._moveLineColor = Qt.green
         self.scene = QGraphicsScene()
         self.scene.addRect(QRectF(0, 0, 290, 200))
         self.graphicsView.setScene(self.scene)
         self.graphicsView.scale(1, -1)
         self.updateStatusBar()
+
+    @property
+    def moveLineColor(self) -> QColor:
+        return self._moveLineColor
+
+    @moveLineColor.setter
+    def moveLineColor(self, new_color: QColor) -> None:
+        self._moveLineColor = new_color
+        for item in self.scene.items():
+            if isinstance(item, MoveOnlyLine):
+                item.color = self.moveLineColor
 
     @property
     def precision(self) -> number:
@@ -82,6 +106,13 @@ class MainWindow(QMainWindow):
         # noinspection PyUnresolvedReferences
         self.statusBar.showMessage('Current pen width: %.3f' % self._precision)
 
+    def actionShowMovementSlot(self, toggle: bool) -> None:
+        self.checkBoxActionShowMovement.setChecked(toggle)
+        self.actionShowMovement.setChecked(toggle)
+        for item in self.scene.items():
+            if isinstance(item, MoveOnlyLine):
+                item.setVisible(toggle)
+
     def askPenWidth(self) -> None:
         # noinspection PyCallByClass, PyTypeChecker
         res = QInputDialog.getDouble(self, 'Change pen width',
@@ -93,6 +124,14 @@ class MainWindow(QMainWindow):
     def actionClearSlot(self) -> None:
         if self.askClearScene():
             self.clearScene()
+
+    def actionSetMoveLineColorSlot(self) -> None:
+        # Inspector doesn't understand Qt's static methods
+        # noinspection PyCallByClass,PyTypeChecker
+        color = QColorDialog.getColor(self.moveLineColor, self,
+                                      'Select new move line color')
+        if QColor.isValid(color):
+            self.moveLineColor = color
 
     def askClearScene(self) -> bool:
         msgbox = QMessageBox(self)
@@ -121,7 +160,8 @@ class MainWindow(QMainWindow):
                                                 'Text files (*.txt);;'
                                                 'All Files (*.*)')
         if filetuple:
-            self.loadGCode(filetuple[0])
+            if os.path.isfile(filetuple[0]):
+                self.loadGCode(filetuple[0])
 
     def zoomIn(self) -> None:
         self.graphicsView.scale(1.15, 1.15)
@@ -181,16 +221,15 @@ class MainWindow(QMainWindow):
             else:
                 y = prevY
             if cmd == 'G0':
-                line = QColoredGraphicsLineItem(
+                line = MoveOnlyLine(
                     line=QLineF(prevX, prevY, x, y),
-                    color=Qt.green,
+                    color=self._moveLineColor,
                     penWidth=self.precision)
                 self.scene.addItem(line)
             elif cmd == 'G1':
                 self.scene.addItem(
                     QColoredGraphicsLineItem(
                         line=QLineF(prevX, prevY, x, y),
-                        color=Qt.black,
                         penWidth=self.precision))
             elif cmd == 'G2' or cmd == 'G3':
                 offsetX = float(args['I'])
@@ -297,7 +336,7 @@ class Arc(QGraphicsEllipseItem, PenWidthSettable):
 # because Qt:
 # noinspection PyPep8Naming
 class QColoredGraphicsLineItem(QGraphicsLineItem, PenWidthSettable):
-    def __init__(self, line: QLineF, color: QColor,
+    def __init__(self, line: QLineF, color: QColor=Qt.black,
                  penWidth: float=1, parent: QWidget=None) -> None:
         super(QColoredGraphicsLineItem, self).__init__(line, parent)
         self._pen.setColor(color)
@@ -317,3 +356,11 @@ class QColoredGraphicsLineItem(QGraphicsLineItem, PenWidthSettable):
         painter.setPen(self._pen)
         painter.setBrush(QBrush())
         painter.drawLine(self.line())
+
+
+# because Qt:
+# noinspection PyPep8Naming
+class MoveOnlyLine(QColoredGraphicsLineItem):
+    def __init__(self, line: QLineF, color: QColor,
+                 penWidth: float=1, parent: QWidget=None):
+        super(MoveOnlyLine, self).__init__(line, color, penWidth, parent)
