@@ -23,24 +23,22 @@
 
 import os
 import math
-from typing import Union, List, Tuple, Dict
+from typing import List
 
 from PyQt5 import uic
 from PyQt5.QtCore import QRectF, QLineF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
-    QGraphicsEllipseItem, QFileDialog, QGraphicsLineItem, QMessageBox, \
-    QInputDialog, QWidget, QStyleOptionGraphicsItem, QGraphicsItem,\
+    QFileDialog, QMessageBox, QInputDialog, QWidget, QGraphicsItem,\
     QCheckBox, QColorDialog
-from PyQt5.QtGui import QPen, QColor, QPainter
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
 
 from utilities import getResourcesPath
-
-
-# number type
-number = Union[int, float]
-GCode = Tuple[str, Dict[str, number]]
+from utilities.types import number, GCode
+from widgets.penwidthsettable import PenWidthSettable
+from widgets.qgraphicsarcitem import QGraphicsArcItem
+from widgets.qgraphicscoloredlineitem import QGraphicsColoredLineItem
+from widgets.qgraphicsmovementlineitem import QGraphicsMovementLineItem
 
 
 # because Qt:
@@ -86,7 +84,7 @@ class MainWindow(QMainWindow):
     def moveLineColor(self, new_color: QColor) -> None:
         self._moveLineColor = new_color
         for item in self.scene.items():
-            if isinstance(item, MoveOnlyLine):
+            if isinstance(item, QGraphicsMovementLineItem):
                 item.color = self.moveLineColor
 
     @property
@@ -110,7 +108,7 @@ class MainWindow(QMainWindow):
         self.checkBoxActionShowMovement.setChecked(toggle)
         self.actionShowMovement.setChecked(toggle)
         for item in self.scene.items():
-            if isinstance(item, MoveOnlyLine):
+            if isinstance(item, QGraphicsMovementLineItem):
                 item.setVisible(toggle)
 
     def askPenWidth(self) -> None:
@@ -221,14 +219,14 @@ class MainWindow(QMainWindow):
             else:
                 y = prevY
             if cmd == 'G0':
-                line = MoveOnlyLine(
+                line = QGraphicsMovementLineItem(
                     line=QLineF(prevX, prevY, x, y),
                     color=self._moveLineColor,
                     penWidth=self.precision)
                 self.scene.addItem(line)
             elif cmd == 'G1':
                 self.scene.addItem(
-                    QColoredGraphicsLineItem(
+                    QGraphicsColoredLineItem(
                         line=QLineF(prevX, prevY, x, y),
                         penWidth=self.precision))
             elif cmd == 'G2' or cmd == 'G3':
@@ -274,8 +272,9 @@ class MainWindow(QMainWindow):
                 delta = alpha - beta
                 if delta == 0:
                     delta = 360
-                ellipse = Arc(rectBottomLeftX, rectBottomLeftY,
-                              rectLength, rectLength, penWidth=self.precision)
+                ellipse = QGraphicsArcItem(rectBottomLeftX, rectBottomLeftY,
+                                           rectLength, rectLength,
+                                           penWidth=self.precision)
                 ellipse.setStartAngle(-alpha)
                 ellipse.setSpanAngle(delta)
                 self.scene.addItem(ellipse)
@@ -290,77 +289,3 @@ class MainWindow(QMainWindow):
                 y = 242.3
             prevX = x
             prevY = y
-
-
-# because Qt:
-# noinspection PyPep8Naming
-class PenWidthSettable(object):
-    def __init__(self):
-        self._pen = QPen()
-
-    @property
-    def penWidth(self) -> float:
-        return self._pen.widthF()
-
-    @penWidth.setter
-    def penWidth(self, newWidth: number) -> None:
-        self._pen.setWidthF(newWidth)
-
-
-# because Qt:
-# noinspection PyPep8Naming
-class Arc(QGraphicsEllipseItem, PenWidthSettable):
-    # Need this class because ellipse would draw a "piece of pie" like circle,
-    # we only need the arc
-    def __init__(self, x: number, y: number, width: number, height: number,
-                 penWidth: float=1, parent: QWidget=None) -> None:
-        super(Arc, self).__init__(x, y, width, height, parent)
-        self._pen.setWidthF(penWidth)
-
-    def setStartAngle(self, angle: number) -> None:
-        # 5760? Yeah no Qt
-        super(Arc, self).setStartAngle(angle * 16)
-        
-    def setSpanAngle(self, angle: number) -> None:
-        # 0-360° convenience
-        super(Arc, self).setSpanAngle(angle * 16)
-
-    def paint(self, painter: QPainter,
-              styleOptionGraphicsItem: QStyleOptionGraphicsItem,
-              widget: QWidget=None):
-        painter.setPen(self._pen)
-        painter.setBrush(QBrush())
-        painter.drawArc(self.rect(), self.startAngle(), self.spanAngle())
-
-
-# because Qt:
-# noinspection PyPep8Naming
-class QColoredGraphicsLineItem(QGraphicsLineItem, PenWidthSettable):
-    def __init__(self, line: QLineF, color: QColor=Qt.black,
-                 penWidth: float=1, parent: QWidget=None) -> None:
-        super(QColoredGraphicsLineItem, self).__init__(line, parent)
-        self._pen.setColor(color)
-        self._pen.setWidthF(penWidth)
-
-    @property
-    def color(self) -> QColor:
-        return self._pen.color()
-
-    @color.setter
-    def color(self, newColor: QColor) -> None:
-        self._pen.setColor(newColor)
-
-    def paint(self, painter: QPainter,
-              styleOptionGraphicsItem: QStyleOptionGraphicsItem,
-              widget: QWidget=None):
-        painter.setPen(self._pen)
-        painter.setBrush(QBrush())
-        painter.drawLine(self.line())
-
-
-# because Qt:
-# noinspection PyPep8Naming
-class MoveOnlyLine(QColoredGraphicsLineItem):
-    def __init__(self, line: QLineF, color: QColor,
-                 penWidth: float=1, parent: QWidget=None):
-        super(MoveOnlyLine, self).__init__(line, color, penWidth, parent)
