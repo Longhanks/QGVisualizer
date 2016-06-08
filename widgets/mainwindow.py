@@ -23,62 +23,79 @@
 
 import os
 import math
+from typing import Union, List, Tuple, Dict
 
 from PyQt5 import uic
 from PyQt5.QtCore import QRectF, QLineF
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
     QGraphicsEllipseItem, QFileDialog, QGraphicsLineItem, QMessageBox, \
-    QInputDialog
-from PyQt5.QtGui import QPen
+    QInputDialog, QWidget, QStyleOptionGraphicsItem, QGraphicsItem
+from PyQt5.QtGui import QPen, QColor, QPainter
 from PyQt5.QtGui import QBrush
 from PyQt5.QtCore import Qt
 
 from utilities import getResourcesPath
 
 
-RESOLUTION = 1
+# number type
+number = Union[int, float]
+GCode = Tuple[str, Dict[str, number]]
 
 
-def setResolution(res):
-    global RESOLUTION
-    RESOLUTION = res
-
-
+# because Qt:
+# noinspection PyPep8Naming
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget=None) -> None:
         super(MainWindow, self).__init__(parent)
         uic.loadUi(os.path.join(getResourcesPath(), 'ui', 'mainwindow.ui'),
                    self)
         self.actionExit.triggered.connect(QApplication.quit)
         self.actionLoad_G_Code.triggered.connect(self.askGCodeFile)
-        self.actionClear.triggered.connect(self.askClearScene)
+        self.actionClear.triggered.connect(self.actionClearSlot)
         self.actionZoomIn.triggered.connect(self.zoomIn)
         self.actionZoomOut.triggered.connect(self.zoomOut)
         self.actionResetZoom.triggered.connect(self.resetZoom)
-        self.actionSetResolution.triggered.connect(self.askResolution)
+        self.actionSetPenWidth.triggered.connect(self.askPenWidth)
 
         self.zoomFactor = 1
+        self._precision = 1
         self.scene = QGraphicsScene()
-        self.scene.addRect(QRectF(0, 0, 290 * RESOLUTION, 200 * RESOLUTION))
+        self.scene.addRect(QRectF(0, 0, 290, 200))
         self.graphicsView.setScene(self.scene)
         self.graphicsView.scale(1, -1)
         self.updateStatusBar()
 
-    def updateStatusBar(self):
-        self.statusBar.showMessage('Current resolution scale: %d' % RESOLUTION)
+    @property
+    def precision(self) -> number:
+        return self._precision
 
-    def askResolution(self):
+    @precision.setter
+    def precision(self, new_precision: number) -> None:
+        self._precision = new_precision
+        for item in self.scene.items():
+            if isinstance(item, PenWidthSettable) and\
+                    isinstance(item, QGraphicsItem):
+                item.penWidth = self.precision
+        self.updateStatusBar()
+
+    def updateStatusBar(self) -> None:
+        # noinspection PyUnresolvedReferences
+        self.statusBar.showMessage('Current pen width: %.3f' % self._precision)
+
+    def askPenWidth(self) -> None:
+        # noinspection PyCallByClass, PyTypeChecker
+        res = QInputDialog.getDouble(self, 'Change pen width',
+                                     'Enter new pen width:',
+                                     self.precision, -10000, 10000, 3)
+        if res[1]:
+            self.precision = res[0]
+
+    def actionClearSlot(self) -> None:
         if self.askClearScene():
-            res = QInputDialog.getDouble(self, 'Change resolution',
-                                         'Enter a new resolution:',
-                                         RESOLUTION, 1)
-            if res[1]:
-                setResolution(res[0])
-                self.updateStatusBar()
-                self.clearScene()
+            self.clearScene()
 
-    def askClearScene(self):
-        msgbox = QMessageBox()
+    def askClearScene(self) -> bool:
+        msgbox = QMessageBox(self)
         msgbox.setText('This will clear the area.')
         msgbox.setInformativeText('Are you sure you want to continue?')
         msgbox.setStandardButtons(
@@ -86,50 +103,48 @@ class MainWindow(QMainWindow):
         msgbox.setDefaultButton(QMessageBox.Cancel)
         ret = msgbox.exec()
         if ret == QMessageBox.Ok:
-            setResolution(1)
-            self.updateStatusBar()
-            self.clearScene()
             return True
         return False
 
-    def clearScene(self):
+    def clearScene(self) -> None:
         self.scene.clear()
-        self.scene.addRect(QRectF(0, 0, 290 * RESOLUTION, 200 * RESOLUTION))
+        self.precision = 1
+        self.updateStatusBar()
+        self.scene.addRect(QRectF(0, 0, 290, 200))
 
-
-    def askGCodeFile(self):
+    def askGCodeFile(self) -> None:
+        # noinspection PyCallByClass, PyTypeChecker
         filetuple = QFileDialog.getOpenFileName(self,
                                                 'Select G Code file',
                                                 getResourcesPath(),
                                                 'G Code files (*.gcode);;'
-                                                'Text files (*.txt)')
+                                                'Text files (*.txt);;'
+                                                'All Files (*.*)')
         if filetuple:
             self.loadGCode(filetuple[0])
 
-    def zoomIn(self):
+    def zoomIn(self) -> None:
         self.graphicsView.scale(1.15, 1.15)
         self.zoomFactor *= 1.15
 
-    def zoomOut(self):
+    def zoomOut(self) -> None:
         self.graphicsView.scale(1.0 / 1.15, 1.0 / 1.15)
         self.zoomFactor /= 1.15
 
-    def resetZoom(self):
+    def resetZoom(self) -> None:
         self.graphicsView.scale(1.0 / self.zoomFactor, 1.0 / self.zoomFactor)
         self.zoomFactor = 1
 
-    def loadGCode(self, filename):
+    def loadGCode(self, filename: str) -> None:
         rawSteps = []
         # a step is tuple of str (command) and dict of arg -> value
         # eg ('G1', {'X': 0})
         with open(filename) as f:
-            for line in f:
-                line = line.split(';',1)[0]
-                if line.endswith('\n'):
-                    line = line[:-1]
+            for index, line in enumerate(f):
+                line = line.split(';', 1)[0]
                 if not line:
                     continue
-                splitted = line.split(' ')
+                splitted = line.strip().split(' ')
                 cmd = splitted[0]
                 packedArgs = splitted[1:]
                 args = {}
@@ -150,7 +165,7 @@ class MainWindow(QMainWindow):
                     args['J'] = 0
         self.execGCode(rawSteps)
 
-    def execGCode(self, codes):
+    def execGCode(self, codes: List[GCode]) -> None:
         relative_mode = False
         prevX = 0
         prevY = 0
@@ -158,50 +173,74 @@ class MainWindow(QMainWindow):
             cmd = code[0]
             args = code[1]
             if 'X' in args:
-                x = (RESOLUTION * float(args['X'])) + \
-                    (prevX if relative_mode else 0)
+                x = float(args['X']) + (prevX if relative_mode else 0)
             else:
                 x = prevX
             if 'Y' in args:
-                y = (RESOLUTION * float(args['Y'])) + \
-                    (prevY if relative_mode else 0)
+                y = float(args['Y']) + (prevY if relative_mode else 0)
             else:
                 y = prevY
             if cmd == 'G0':
-                line = QColoredGraphicsLineItem(QLineF(prevX, prevY, x, y),
-                                                Qt.green)
+                line = QColoredGraphicsLineItem(
+                    line=QLineF(prevX, prevY, x, y),
+                    color=Qt.green,
+                    penWidth=self.precision)
                 self.scene.addItem(line)
             elif cmd == 'G1':
-                self.scene.addLine(QLineF(prevX, prevY, x, y))
+                self.scene.addItem(
+                    QColoredGraphicsLineItem(
+                        line=QLineF(prevX, prevY, x, y),
+                        color=Qt.black,
+                        penWidth=self.precision))
             elif cmd == 'G2' or cmd == 'G3':
-                offsetX = RESOLUTION * float(args['I'])
-                offsetY = RESOLUTION * float(args['J'])
-                radius = math.sqrt(offsetX ** 2 + offsetY ** 2)
-                middleX = prevX + offsetX
-                middleY = prevY + offsetY
+                offsetX = float(args['I'])
+                offsetY = float(args['J'])
+                if offsetX == 0 and offsetY == 0:
+                    # only R given
+                    radius = float(args['R'])
+                    dx = x - prevX
+                    dy = y - prevY
+                    dist = math.sqrt(dx ** 2 + dy ** 2)
+                    h = math.sqrt((radius ** 2) - ((dist ** 2) / 4))
+                    tmpx = dy * h / dist
+                    tmpy = -dx * h / dist
+                    ccw = (cmd == 'G3')
+                    if (ccw and radius > 0) or ((not ccw) and radius < 0):
+                        tmpx = -tmpx
+                        tmpy = -tmpy
+                    middleX = tmpx + (2 * x - dx) / 2
+                    middleY = tmpy + (2 * y - dy) / 2
+                else:
+                    radius = math.sqrt(offsetX ** 2 + offsetY ** 2)
+                    middleX = prevX + offsetX
+                    middleY = prevY + offsetY
                 rectBottomLeftX = middleX - radius
                 rectBottomLeftY = middleY - radius
                 rectLength = 2 * radius
                 alpha = math.degrees(math.atan2(prevY - middleY,
                                                 prevX - middleX))
                 beta = math.degrees(math.atan2(y - middleY, x - middleX))
-                if beta == 180:
-                    beta = -180
-                if alpha * beta < 0:
-                    if alpha < 0:
-                        alpha += 360
-                    elif beta < 0:
-                        beta += 360
-
-                delta = beta - alpha
+                if cmd == 'G2':
+                    if beta > alpha:
+                        if beta >= 180:
+                            beta -= 360
+                        else:
+                            alpha += 360
+                elif cmd == 'G3':
+                    if beta < alpha:
+                        if alpha > 180:
+                            alpha -= 360
+                        else:
+                            beta += 360
+                delta = alpha - beta
                 if delta == 0:
                     delta = 360
                 ellipse = Arc(rectBottomLeftX, rectBottomLeftY,
-                              rectLength, rectLength)
-                ellipse.setStartAngle(-max(alpha, beta))
-                ellipse.setSpanAngle(abs(delta))
+                              rectLength, rectLength, penWidth=self.precision)
+                ellipse.setStartAngle(-alpha)
+                ellipse.setSpanAngle(delta)
                 self.scene.addItem(ellipse)
-            elif cmd =='G91':
+            elif cmd == 'G91':
                 relative_mode = True
             elif cmd == 'G90':
                 relative_mode = False
@@ -214,32 +253,67 @@ class MainWindow(QMainWindow):
             prevY = y
 
 
-class Arc(QGraphicsEllipseItem):
+# because Qt:
+# noinspection PyPep8Naming
+class PenWidthSettable(object):
+    def __init__(self):
+        self._pen = QPen()
+
+    @property
+    def penWidth(self) -> float:
+        return self._pen.widthF()
+
+    @penWidth.setter
+    def penWidth(self, newWidth: number) -> None:
+        self._pen.setWidthF(newWidth)
+
+
+# because Qt:
+# noinspection PyPep8Naming
+class Arc(QGraphicsEllipseItem, PenWidthSettable):
     # Need this class because ellipse would draw a "piece of pie" like circle,
     # we only need the arc
-    def __init__(self, x, y, width, height, parent=None):
+    def __init__(self, x: number, y: number, width: number, height: number,
+                 penWidth: float=1, parent: QWidget=None) -> None:
         super(Arc, self).__init__(x, y, width, height, parent)
+        self._pen.setWidthF(penWidth)
 
-    def setStartAngle(self, angle):
+    def setStartAngle(self, angle: number) -> None:
         # 5760? Yeah no Qt
         super(Arc, self).setStartAngle(angle * 16)
         
-    def setSpanAngle(self, angle):
+    def setSpanAngle(self, angle: number) -> None:
         # 0-360° convenience
         super(Arc, self).setSpanAngle(angle * 16)
 
-    def paint(self, painter, styleoptionGraphicsItem, widget=None):
-        painter.setPen(QPen())
+    def paint(self, painter: QPainter,
+              styleOptionGraphicsItem: QStyleOptionGraphicsItem,
+              widget: QWidget=None):
+        painter.setPen(self._pen)
         painter.setBrush(QBrush())
         painter.drawArc(self.rect(), self.startAngle(), self.spanAngle())
 
 
-class QColoredGraphicsLineItem(QGraphicsLineItem):
-    def __init__(self, line, color, parent=None):
+# because Qt:
+# noinspection PyPep8Naming
+class QColoredGraphicsLineItem(QGraphicsLineItem, PenWidthSettable):
+    def __init__(self, line: QLineF, color: QColor,
+                 penWidth: float=1, parent: QWidget=None) -> None:
         super(QColoredGraphicsLineItem, self).__init__(line, parent)
-        self.color = color
+        self._pen.setColor(color)
+        self._pen.setWidthF(penWidth)
 
-    def paint(self, painter, styleoptionGraphicsItem, widget=None):
-        painter.setPen(QPen(self.color))
+    @property
+    def color(self) -> QColor:
+        return self._pen.color()
+
+    @color.setter
+    def color(self, newColor: QColor) -> None:
+        self._pen.setColor(newColor)
+
+    def paint(self, painter: QPainter,
+              styleOptionGraphicsItem: QStyleOptionGraphicsItem,
+              widget: QWidget=None):
+        painter.setPen(self._pen)
         painter.setBrush(QBrush())
         painter.drawLine(self.line())

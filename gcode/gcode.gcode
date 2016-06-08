@@ -1,12 +1,12 @@
 ; Start bottom left square
 G0 X0 Y5
-G3 I5 X5 Y0
+G3 X5 Y0 R5
 G1 X15
-G3 J5 X20 Y5
+G3 X20 Y5 R5
 G1 Y15
-G3 I-5 X15 Y20
+G3 R5 X15 Y20
 G1 X5
-G3 J-5 X0 Y15
+G3 R5 X0 Y15
 G1 Y5
 ; Start top right square
 G0 X20 Y25

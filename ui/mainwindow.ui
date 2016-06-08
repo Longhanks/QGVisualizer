@@ -26,7 +26,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>24</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -44,7 +44,7 @@
     <addaction name="actionZoomIn"/>
     <addaction name="actionZoomOut"/>
     <addaction name="actionResetZoom"/>
-    <addaction name="actionSetResolution"/>
+    <addaction name="actionSetPenWidth"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -67,12 +67,13 @@
    <addaction name="actionZoomOut"/>
    <addaction name="actionResetZoom"/>
    <addaction name="separator"/>
-   <addaction name="actionSetResolution"/>
+   <addaction name="actionSetPenWidth"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLoad_G_Code">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Load G-Code</string>
@@ -80,7 +81,8 @@
   </action>
   <action name="actionExit">
    <property name="icon">
-    <iconset theme="application-exit"/>
+    <iconset theme="application-exit">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Exit</string>
@@ -88,7 +90,8 @@
   </action>
   <action name="actionClear">
    <property name="icon">
-    <iconset theme="edit-clear"/>
+    <iconset theme="edit-clear">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Clear</string>
@@ -96,7 +99,8 @@
   </action>
   <action name="actionZoomIn">
    <property name="icon">
-    <iconset theme="zoom-in"/>
+    <iconset theme="zoom-in">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Zoom in</string>
@@ -107,7 +111,8 @@
   </action>
   <action name="actionZoomOut">
    <property name="icon">
-    <iconset theme="zoom-out"/>
+    <iconset theme="zoom-out">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Zoom out</string>
@@ -118,15 +123,19 @@
   </action>
   <action name="actionResetZoom">
    <property name="icon">
-    <iconset theme="zoom-original"/>
+    <iconset theme="zoom-original">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Reset zoom</string>
    </property>
   </action>
-  <action name="actionSetResolution">
+  <action name="actionSetPenWidth">
    <property name="text">
-    <string>Set resolution...</string>
+    <string>Set pen width...</string>
+   </property>
+   <property name="toolTip">
+    <string>Set pen width</string>
    </property>
   </action>
  </widget>
