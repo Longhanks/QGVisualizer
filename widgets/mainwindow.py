@@ -223,6 +223,8 @@ class MainWindow(QMainWindow):
                     line=QLineF(prevX, prevY, x, y),
                     color=self._moveLineColor,
                     penWidth=self.precision)
+                if not self.checkBoxActionShowMovement.isChecked():
+                    line.setVisible(False)
                 self.scene.addItem(line)
             elif cmd == 'G1':
                 self.scene.addItem(
