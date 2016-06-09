@@ -26,12 +26,12 @@ import math
 from typing import List
 
 from PyQt5 import uic
-from PyQt5.QtCore import QRectF, QLineF
+from PyQt5.QtCore import QRectF, QLineF, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
     QFileDialog, QMessageBox, QInputDialog, QWidget, QGraphicsItem,\
     QCheckBox, QColorDialog
-from PyQt5.QtGui import QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor, QPainter, QPageLayout
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 
 from utilities import getResourcesPath
 from utilities.types import number, GCode
@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
                    self)
         self.actionExit.triggered.connect(QApplication.quit)
         self.actionLoad_G_Code.triggered.connect(self.askGCodeFile)
+        self.actionPrint.triggered.connect(self.actionPrintSlot)
         self.actionClear.triggered.connect(self.actionClearSlot)
         self.actionZoomIn.triggered.connect(self.zoomIn)
         self.actionZoomOut.triggered.connect(self.zoomOut)
@@ -99,6 +100,15 @@ class MainWindow(QMainWindow):
                     isinstance(item, QGraphicsItem):
                 item.penWidth = self.precision
         self.updateStatusBar()
+
+    def actionPrintSlot(self) -> None:
+        printer = QPrinter()
+        printer.setPageOrientation(QPageLayout.Landscape)
+        if QPrintDialog(printer).exec_():
+            painter = QPainter(printer)
+            painter.setRenderHint(QPainter.Antialiasing)
+            self.scene.render(painter)
+            del painter  # necessary, thanks Qt
 
     def updateStatusBar(self) -> None:
         # noinspection PyUnresolvedReferences
