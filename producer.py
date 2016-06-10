@@ -23,36 +23,32 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import sys
+
 import os
 import math
 
-
-sys.path.insert(0, os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..')))
-
-
 from utilities import getResourcesPath
+from utilities.types import number
+
 
 gcodeDir = os.path.join(getResourcesPath(), 'gcode')
-
-
 steps = []
 
 
-def move(x, y):
+def move(x: number, y: number) -> None:
     steps.append('G0 X%f Y%f' % (x, y))
 
 
-def cut(x, y):
+def cut(x: number, y: number) -> None:
     steps.append('G1 X%f Y%f' % (x, y))
 
 
-def comment(cmt):
+def comment(cmt: str) -> None:
     steps.append('; ' + cmt)
 
 
-def arc(x, y, i, j, clockwise=True):
+def arc(x: number, y: number, i: number, j: number,
+        clockwise: bool=True) -> None:
     if clockwise:
         cmd = 'G2'
     else:
@@ -60,7 +56,7 @@ def arc(x, y, i, j, clockwise=True):
     steps.append(cmd + ' X%f Y%f I%f J%f' % (x, y, i, j))
 
 
-def arc_radius(x, y, r, clockwise=True):
+def arc_radius(x: number, y: number, r: number, clockwise=True) -> None:
     if clockwise:
         cmd = 'G2'
     else:
@@ -68,15 +64,15 @@ def arc_radius(x, y, r, clockwise=True):
     steps.append(cmd + ' X%f Y%f R%f' % (x, y, r))
 
 
-def relative():
+def relative() -> None:
     steps.append('G91')
 
 
-def absolute():
+def absolute() -> None:
     steps.append('G90')
 
 
-def header():
+def header() -> None:
     steps.append(';header')
     steps.append('G28 ;home')
     steps.append('G21 ;units in mm')
@@ -84,16 +80,54 @@ def header():
     steps.append('M649 L1 P5 S100')
     steps.append('F1000 ;20mm/s')
     steps.append('M649 S100')
-    move(0, 0)
-
-def footer():
-    steps.append( '; footer')
-    steps.append( 'G90 ;abs coords')
-    steps.append( 'G0 X0 Y230 ;pre-home')
-    steps.append( 'M2')
 
 
-def squares():
+def footer() -> None:
+    steps.append('; footer')
+    steps.append('G90 ;abs coords')
+    steps.append('G0 X0 Y230 ;pre-home')
+    steps.append('M2')
+
+
+class Raspi(object):
+    width = 85
+    height = 56
+    screws_offset = 58
+    screw_edge_offste = 3.5
+    screw_radius = 1.375
+
+
+class BackBottomHole(object):
+    hole = 8
+    bumper = 8
+    floor_hole = 7
+
+
+class Material(object):
+    width = 290
+    height = 200
+    thickness = 3.8
+
+
+class FrontBottomHole(object):
+    width = 5
+    height = 5
+
+
+class FrontMiddleHole(object):
+    width = 20
+    height = Material.thickness
+
+
+class MotorHole(object):
+    width = 22
+    height = 11.3
+    edge_small_border = 4.5
+    edge_long_border = 11
+    screw_radius = 1
+
+
+def squares() -> None:
     header()
     comment('Start bottom left square')
     move(0, 5)
@@ -133,57 +167,57 @@ def squares():
     del steps[:]
 
 
-def front():
-    header()
-    HEIGHT = 200
-    BOTTOM_HOLE_WIDTH = 5
-    BOTTOM_HOLE_HEIGHT = 5
-    MIDDLE_HOLE_WIDTH = 20
-    MIDDLE_HOLE_HEIGHT = 3.8
-    # motor = 12mm * 22mm
-    MOTOR_HOLE_WIDTH = 23
-    MOTOR_HOLE_HEIGHT = 13
-
+def front() -> None:
     def cut_bottom_hole() -> None:
         """
         Starts in bottom left corner, moves right & up
         """
-        cut(BOTTOM_HOLE_WIDTH, 0)
-        cut(0, BOTTOM_HOLE_HEIGHT)
-        cut(-BOTTOM_HOLE_WIDTH , 0)
+        cut(FrontBottomHole.width, 0)
+        cut(0, -FrontBottomHole.height)
+        cut(-FrontBottomHole.width, 0)
 
     def cut_middle_hole() -> None:
         """
         Starts in bottom left corner, moves right & up
         """
-        cut(0, MIDDLE_HOLE_HEIGHT)
-        cut(MIDDLE_HOLE_WIDTH, 0)
-        cut(0, -MIDDLE_HOLE_HEIGHT)
-        cut(-MIDDLE_HOLE_WIDTH, 0)
+        cut(0, FrontMiddleHole.height)
+        cut(FrontMiddleHole.width, 0)
+        cut(0, -FrontMiddleHole.height)
+        cut(-FrontMiddleHole.width, 0)
 
     def cut_motor_hole() -> None:
         """
         Starts in bottom left corner, moves right & up
         """
-        cut(0, MOTOR_HOLE_HEIGHT)
-        cut(MOTOR_HOLE_WIDTH, 0)
-        cut(0, -MOTOR_HOLE_HEIGHT)
-        cut(-MOTOR_HOLE_WIDTH, 0)
+        move(-(MotorHole.edge_small_border / 2 - MotorHole.screw_radius / 2),
+             MotorHole.edge_long_border / 2)
+        arc(0, 0, -MotorHole.screw_radius, 0)
+        move(MotorHole.edge_small_border / 2 - MotorHole.screw_radius / 2,
+             -(MotorHole.edge_long_border / 2))
+        cut(0, MotorHole.height)
+        cut(MotorHole.width, 0)
+        cut(0, -MotorHole.height)
+        move(MotorHole.edge_small_border / 2 - MotorHole.screw_radius / 2,
+             MotorHole.edge_long_border / 2)
+        arc(0, 0, MotorHole.screw_radius, 0)
+        move(-(MotorHole.edge_small_border / 2 - MotorHole.screw_radius / 2),
+             -(MotorHole.edge_long_border / 2))
+        cut(-MotorHole.width, 0)
 
+    header()
+    move(0, 120)
     # Start by cutting bottom holes @ 40% height start and 60% height stop
     relative()
-    move(0, 80)
     cut_bottom_hole()
-    move(0, 30)
+    move(0, -30)
     cut_bottom_hole()
 
     # Move to start point for cutting middle holes
     absolute()
-    # 15 padding left, place holes on middle line and move cursor to top left
-    move(15, HEIGHT / 2 - MIDDLE_HOLE_HEIGHT / 2)  # 15/98
-
+    # 15 padding left, place holes on middle line and move cursor to
+    # bottom left
+    move(9, Material.height / 2 - FrontMiddleHole.height / 2)  # 15/98
     relative()
-    move(-6, 0)
     for _ in range(6):
         # 290 width, 15 padding at each side -> 260 width,
         # that makes 6 segments of 20mm hole, 20mm whitespace and one last
@@ -203,7 +237,7 @@ def front():
     relative()
     cut_motor_hole()
     absolute()
-    move(240, 170 - MOTOR_HOLE_HEIGHT)
+    move(240, 170 - MotorHole.height)
     relative()
     cut_motor_hole()
 
@@ -223,14 +257,6 @@ def front():
 
 
 def back():
-    header()
-    RASPI_WIDTH = 85
-    RASPI_HEIGHT = 56
-    RASPI_TOP_RIGHT = (225, 135)
-    BOTTOM_BACK_STAND_HOLE = 8
-    BOTTOM_BACK_STAND_BUMPER = 8
-    BOTTOM_BACK_STAND_FLOORHOLE = 7
-
     def cut_hook():
         cut(0, 3.8)
         arc(4, 4, 4, 0, clockwise=True)
@@ -241,12 +267,100 @@ def back():
         cut(0, -3.8)
         cut(6, 0)
 
+    top_angle = math.atan(100 / 190)
+    outer_top_angle = math.radians(90) - top_angle
+
+    header()
+
+    # Cut cable hole
+    absolute()
+    move(250, 170)
     relative()
-    # 10mm off the left chart for nicer cut
+    arc(0, 0, 5, 5, clockwise=True)
+
+    absolute()
+    move(225, 135)
+    relative()
+
+    # calculate triangle for rotated raspi rectangle
+    width_offset = Raspi.width * math.sin(math.radians(45))
+    height_offset = Raspi.height * math.sin(math.radians(45))
+
+    # Cut screw holes.
+    move(-width_offset, -width_offset)
+    move(0, Raspi.screw_edge_offste)
+    arc(0, 0, 0, Raspi.screw_radius)
+    move((width_offset / Raspi.width) * Raspi.screws_offset,
+         (width_offset / Raspi.width) * Raspi.screws_offset)
+    arc(0, 0, 0, Raspi.screw_radius)
+    move(0, -Raspi.screw_edge_offste)
+    move(-(width_offset / Raspi.width) * Raspi.screws_offset,
+         -(width_offset / Raspi.width) * Raspi.screws_offset)
+    move(-height_offset, height_offset)
+    move(Raspi.screw_edge_offste, 0)
+    arc(0, 0, Raspi.screw_radius, 0)
+    move((width_offset / Raspi.width) * Raspi.screws_offset,
+         (width_offset / Raspi.width) * Raspi.screws_offset)
+    arc(0, 0, Raspi.screw_radius, 0)
+
+    # Now cut half moon stand plate
+    absolute()
+    move(20, 10)
+    relative()
+    cut(50, 0)
+    cut(0, 5)
+    cut(-5, 0)
+    cut(0, Material.thickness)
+    cut(5, 0)
+    move(-50, -5 - Material.thickness)
+    cut(0, 5)
+    cut(5, 0)
+    cut(0, Material.thickness)
+    cut(-5, 0)
+    # Bottom vase done, cut middle T piece
+    move(10, 0)
+    cut(0, -Material.thickness)
+    cut(30, 0)
+    cut(0, Material.thickness)
+    cut(-(15 - Material.thickness / 2), 0)
+    cut(0, BackBottomHole.hole)
+    cut(-Material.thickness, 0)
+    cut(0, -BackBottomHole.hole)
+    cut(-(15 - Material.thickness / 2), 0)
+    # cut hole at top
+    _radius = BackBottomHole.hole + BackBottomHole.bumper + \
+        BackBottomHole.floor_hole
+    move(15 - Material.thickness / 2, _radius)
+    cut(0, -BackBottomHole.floor_hole)
+    cut(Material.thickness, 0)
+    cut(0, BackBottomHole.floor_hole)
+    # cut the two circles
+    arc(_radius, -_radius, 0, -_radius)
+    move(-(_radius + Material.thickness), _radius)
+    arc(-_radius, -_radius, 0, -_radius, clockwise=False)
+
+    # Now cut bump at bottom of back so it fits into half moon stand
+    absolute()
     move(0, 190)
+    relative()
+    offset_x = math.sin(top_angle) * BackBottomHole.hole
+    offset_y = math.sin(outer_top_angle) * BackBottomHole.hole
+    move(offset_x, -offset_y)
+    offset_paper_x = math.cos(top_angle) * Material.thickness
+    offset_paper_y = math.sin(top_angle) * Material.thickness
+    cut(offset_paper_x, offset_paper_y)
+    offset_bumber_x = math.sin(top_angle) * BackBottomHole.bumper
+    offset_bumper_y = math.sin(outer_top_angle) * BackBottomHole.bumper
+    cut(offset_bumber_x, -offset_bumper_y)
+    cut(-offset_paper_x, -offset_paper_y)
+
+    # Start frame
+    absolute()
+    move(0, 190)
+    relative()
     # Cut to 15mm padding
     cut(15, 0)
-    # Same as above middle holes: 6x hook - 20mm, one time only hook
+    # Same as middle holes: 6x hook - 20mm, one time only hook
     for _ in range(6):
         cut_hook()
         cut(20, 0)
@@ -258,96 +372,9 @@ def back():
     cut(-190, -190)
 
     # cut outline back to top
-    top_angle = math.atan(100 / 190)
-    outer_top_angle = math.radians(90) - top_angle
-    overcut_x = math.cos(outer_top_angle) * 10
-    overcut_y = math.sin(outer_top_angle) * 10
-
     absolute()
     cut(0, 190)
     relative()
-
-    # Now cut bump at bottom of back so it fits into half moon stand
-    absolute()
-    move(0, 190)
-    relative()
-    offset_x = math.sin(top_angle) * BOTTOM_BACK_STAND_HOLE
-    offset_y = math.sin(outer_top_angle) * BOTTOM_BACK_STAND_HOLE
-    move(offset_x, -offset_y)
-    offset_paper_x = math.cos(top_angle) * 4
-    offset_paper_y = math.sin(top_angle) * 4
-    cut(offset_paper_x, offset_paper_y)
-    offset_bumber_x = math.sin(top_angle) * BOTTOM_BACK_STAND_BUMPER
-    offset_bumper_y = math.sin(outer_top_angle) * BOTTOM_BACK_STAND_BUMPER
-    cut(offset_bumber_x, -offset_bumper_y)
-    cut(-offset_paper_x, -offset_paper_y)
-
-    # Cut cable hole
-    absolute()
-    move(0, 190)
-    relative()
-    move(250, -20)
-    arc(0, 0, 5, 5, clockwise=True)
-
-    absolute()
-    move(*RASPI_TOP_RIGHT)
-    relative()
-
-    # calculate triangle for rotated raspi rectangle
-    width_offset = RASPI_WIDTH * math.sin(math.radians(45))
-    height_offset = RASPI_HEIGHT * math.sin(math.radians(45))
-
-    # Cut screw holes.
-    # Center of screw hole is -3.5mm -3.5mm from edge
-    move(-width_offset, -width_offset)
-    move(0, 3.5)
-    arc(0, 0, 0, 1.25)
-    move((width_offset / RASPI_WIDTH) * 58, (width_offset / RASPI_WIDTH) * 58)
-    arc(0, 0, 0, 1.25)
-    move(0, -3.5)
-    move(-(width_offset / RASPI_WIDTH) * 58,
-         -(width_offset / RASPI_WIDTH) * 58)
-    move(-height_offset, height_offset)
-    move(3.5, 0)
-    arc(0, 0, 1.25, 0)
-    move((width_offset / RASPI_WIDTH) * 58, (width_offset / RASPI_WIDTH) * 58)
-    arc(0, 0, 1.25, 0)
-
-    # Now cut half moon stand plate
-    absolute()
-    move(20, 10)
-    relative()
-    cut(50, 0)
-    cut(0, 5)
-    cut(-5.25, 0)
-    cut(0, 4)
-    cut(5.25, 0)
-    move(-50, -9)
-    cut(0, 5)
-    cut(5.25, 0)
-    cut(0, 4)
-    cut(-5.25, 0)
-    # Bottom vase done, cut middle T piece
-    move(9.75, 0)
-    cut(0, -4)
-    cut(30.5, 0)
-    cut(0, 4)
-    cut(-13.25, 0)
-    cut(0, BOTTOM_BACK_STAND_HOLE)
-    cut(-4, 0)
-    cut(0, -BOTTOM_BACK_STAND_HOLE)
-    cut(-13.25, 0)
-    # cut hole at top
-    _radius = BOTTOM_BACK_STAND_HOLE + BOTTOM_BACK_STAND_BUMPER +\
-        BOTTOM_BACK_STAND_FLOORHOLE
-    move(13.25, _radius)
-    cut(0, -BOTTOM_BACK_STAND_FLOORHOLE)
-    cut(4, 0)
-    cut(0, BOTTOM_BACK_STAND_FLOORHOLE)
-    # cut the two circles
-    arc(_radius, -_radius, 0, -_radius)
-    move(-(_radius + 4), _radius)
-    arc(-_radius, -_radius, 0, -_radius, clockwise=False)
 
     footer()
     with open(os.path.join(gcodeDir, 'back.gcode'), 'w') as gcode:

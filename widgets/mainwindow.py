@@ -26,7 +26,7 @@ import math
 from typing import List
 
 from PyQt5 import uic
-from PyQt5.QtCore import QRectF, QLineF, Qt, QRect
+from PyQt5.QtCore import QRectF, QLineF, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
     QFileDialog, QMessageBox, QInputDialog, QWidget, QGraphicsItem,\
     QCheckBox, QColorDialog, QGraphicsView
@@ -112,7 +112,7 @@ class MainWindow(QMainWindow):
             view = QGraphicsView()
             view.setScene(self.scene)
             view.setSceneRect(QRectF(0, 0, 290, 200))
-            view.fitInView(QRectF(0, 0, 290, 200))
+            view.fitInView(QRectF(0, 0, 290, 200), Qt.KeepAspectRatio)
             view.scale(1, -1)
             view.render(painter)
             del painter  # necessary, thanks Qt
