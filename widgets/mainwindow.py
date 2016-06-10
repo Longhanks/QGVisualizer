@@ -26,11 +26,11 @@ import math
 from typing import List
 
 from PyQt5 import uic
-from PyQt5.QtCore import QRectF, QLineF, Qt
+from PyQt5.QtCore import QRectF, QLineF, Qt, QRect
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene,\
     QFileDialog, QMessageBox, QInputDialog, QWidget, QGraphicsItem,\
-    QCheckBox, QColorDialog
-from PyQt5.QtGui import QColor, QPainter, QPageLayout
+    QCheckBox, QColorDialog, QGraphicsView
+from PyQt5.QtGui import QColor, QPainter, QPageLayout, QPen, QBrush
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 
 from utilities import getResourcesPath
@@ -71,10 +71,12 @@ class MainWindow(QMainWindow):
         self.zoomFactor = 1
         self._precision = 1
         self._moveLineColor = Qt.green
+        self.material = None
         self.scene = QGraphicsScene()
-        self.scene.addRect(QRectF(0, 0, 290, 200))
         self.graphicsView.setScene(self.scene)
         self.graphicsView.scale(1, -1)
+        self.graphicsView.setBackgroundBrush(QBrush(Qt.lightGray))
+        self.clearScene()
         self.updateStatusBar()
 
     @property
@@ -107,7 +109,12 @@ class MainWindow(QMainWindow):
         if QPrintDialog(printer).exec_():
             painter = QPainter(printer)
             painter.setRenderHint(QPainter.Antialiasing)
-            self.scene.render(painter)
+            view = QGraphicsView()
+            view.setScene(self.scene)
+            view.setSceneRect(QRectF(0, 0, 290, 200))
+            view.fitInView(QRectF(0, 0, 290, 200))
+            view.scale(1, -1)
+            view.render(painter)
             del painter  # necessary, thanks Qt
 
     def updateStatusBar(self) -> None:
@@ -157,7 +164,9 @@ class MainWindow(QMainWindow):
         self.scene.clear()
         self.precision = 1
         self.updateStatusBar()
-        self.scene.addRect(QRectF(0, 0, 290, 200))
+        self.material = self.scene.addRect(QRectF(0, 0, 290, 200))
+        self.material.setPen(QPen(Qt.white))
+        self.material.setBrush(QBrush(Qt.white))
 
     def askGCodeFile(self) -> None:
         # noinspection PyCallByClass, PyTypeChecker

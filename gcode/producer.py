@@ -76,7 +76,25 @@ def absolute():
     steps.append('G90')
 
 
+def header():
+    steps.append(';header')
+    steps.append('G28 ;home')
+    steps.append('G21 ;units in mm')
+    steps.append('G90 ;abs coords')
+    steps.append('M649 L1 P5 S100')
+    steps.append('F1000 ;20mm/s')
+    steps.append('M649 S100')
+    move(0, 0)
+
+def footer():
+    steps.append( '; footer')
+    steps.append( 'G90 ;abs coords')
+    steps.append( 'G0 X0 Y230 ;pre-home')
+    steps.append( 'M2')
+
+
 def squares():
+    header()
     comment('Start bottom left square')
     move(0, 5)
     arc(5, 0, 5, 0, clockwise=False)
@@ -109,17 +127,19 @@ def squares():
     arc(35, 30, 0, -5, clockwise=False)
     arc(30, 25, -5, 0, clockwise=False)
     arc(25, 30, 0, 5, clockwise=False)
+    footer()
     with open(os.path.join(gcodeDir, 'squares.gcode'), 'w') as gcode:
         gcode.write('\n'.join(steps))
     del steps[:]
 
 
 def front():
+    header()
     HEIGHT = 200
     BOTTOM_HOLE_WIDTH = 5
     BOTTOM_HOLE_HEIGHT = 5
     MIDDLE_HOLE_WIDTH = 20
-    MIDDLE_HOLE_HEIGHT = 4
+    MIDDLE_HOLE_HEIGHT = 3.8
     # motor = 12mm * 22mm
     MOTOR_HOLE_WIDTH = 23
     MOTOR_HOLE_HEIGHT = 13
@@ -128,12 +148,9 @@ def front():
         """
         Starts in bottom left corner, moves right & up
         """
-        # Cut a little over the edge
-        move(-1, 0)
-        cut(BOTTOM_HOLE_WIDTH + 1, 0)
+        cut(BOTTOM_HOLE_WIDTH, 0)
         cut(0, BOTTOM_HOLE_HEIGHT)
-        cut(-BOTTOM_HOLE_WIDTH - 1, 0)
-        move(1, 0)
+        cut(-BOTTOM_HOLE_WIDTH , 0)
 
     def cut_middle_hole() -> None:
         """
@@ -166,6 +183,7 @@ def front():
     move(15, HEIGHT / 2 - MIDDLE_HOLE_HEIGHT / 2)  # 15/98
 
     relative()
+    move(-6, 0)
     for _ in range(6):
         # 290 width, 15 padding at each side -> 260 width,
         # that makes 6 segments of 20mm hole, 20mm whitespace and one last
@@ -198,12 +216,14 @@ def front():
     cut(0, 0)
 
     # Done, write
+    footer()
     with open(os.path.join(gcodeDir, 'front.gcode'), 'w') as gcode:
         gcode.write('\n'.join(steps))
     del steps[:]
 
 
 def back():
+    header()
     RASPI_WIDTH = 85
     RASPI_HEIGHT = 56
     RASPI_TOP_RIGHT = (225, 135)
@@ -212,46 +232,40 @@ def back():
     BOTTOM_BACK_STAND_FLOORHOLE = 7
 
     def cut_hook():
-        cut(0, 4)
+        cut(0, 3.8)
         arc(4, 4, 4, 0, clockwise=True)
         cut(13, 0)
         arc(3, -3, 0, -3, clockwise=True)
         arc(-1, -1, -1, 0, clockwise=True)
-        cut(-9, 0)
-        cut(0, -4)
+        cut(-5, 0)
+        cut(0, -3.8)
+        cut(6, 0)
 
     relative()
     # 10mm off the left chart for nicer cut
-    move(-10, 190)
+    move(0, 190)
     # Cut to 15mm padding
-    cut(25, 0)
+    cut(15, 0)
     # Same as above middle holes: 6x hook - 20mm, one time only hook
     for _ in range(6):
         cut_hook()
-        cut(30, 0)
+        cut(20, 0)
     # the "only hook"
     cut_hook()
     # 10mm to end of hook, 15mm padding, 10mm off the edge
-    cut(35, 0)
-    move(0, 10)
+    cut(15, 0)
     # cut outline to bottom
-    cut(-210, -210)
-    move(10, 10)
+    cut(-190, -190)
 
     # cut outline back to top
     top_angle = math.atan(100 / 190)
     outer_top_angle = math.radians(90) - top_angle
     overcut_x = math.cos(outer_top_angle) * 10
     overcut_y = math.sin(outer_top_angle) * 10
-    # cut a little over the bottom
-    cut(overcut_x, -overcut_y)
 
     absolute()
     cut(0, 190)
     relative()
-
-    # Cut a little over the top
-    cut(-overcut_x, overcut_y)
 
     # Now cut bump at bottom of back so it fits into half moon stand
     absolute()
@@ -301,7 +315,7 @@ def back():
 
     # Now cut half moon stand plate
     absolute()
-    move(220, 10)
+    move(20, 10)
     relative()
     cut(50, 0)
     cut(0, 5)
@@ -335,6 +349,7 @@ def back():
     move(-(_radius + 4), _radius)
     arc(-_radius, -_radius, 0, -_radius, clockwise=False)
 
+    footer()
     with open(os.path.join(gcodeDir, 'back.gcode'), 'w') as gcode:
         gcode.write('\n'.join(steps))
     del steps[:]
